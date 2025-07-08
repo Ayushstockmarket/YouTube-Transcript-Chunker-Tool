@@ -675,6 +675,7 @@
     <button onclick="pasteTranscript()">📥 Paste Transcript</button>
     <button onclick="processTranscript()">⚡ Generate Chunks</button>
     <button onclick="copyConsoleScriptAndGoToYouTube()">💻 Copy YouTube Console Script & Go to YouTube</button>
+    <button onclick="copyDriveScriptAndGoToDrive()">💻 Copy Google Drive Console Script & Go to Drive</button>
     <button id="showTutorialBtn" onclick="toggleQuickTutorial()" style="position:fixed;right:18px;bottom:24px;z-index:1002;background:#ffc107;color:#333;border:none;border-radius:50%;width:54px;height:54px;font-size:2em;box-shadow:0 2px 8px #0002;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">❓</button>
     <button id="modeToggleBtn" onclick="toggleMode()" style="position:fixed;right:18px;top:24px;z-index:1002;background:#007bff;color:#fff;border:none;border-radius:50%;width:54px;height:54px;font-size:2em;box-shadow:0 2px 8px #0002;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">🌙</button>
 
@@ -779,11 +780,68 @@
 })();
     </div>
 
+    <div id="driveScriptBox" style="display:none">
+(async () => {
+    // Google Drive Video Transcript Extractor
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    async function waitForSegments(maxWait = 10000) {
+        const interval = 500;
+        let waited = 0;
+        while (waited < maxWait) {
+            const segments = document.querySelectorAll('.JnEIz');
+            if (segments.length > 0) return segments;
+            await sleep(interval);
+            waited += interval;
+        }
+        return null;
+    }
+    // Step 1: Try to open transcript if not already open
+    let segments = document.querySelectorAll('.JnEIz');
+    if (segments.length === 0) {
+        console.log("📄 Transcript not found. Please open the transcript panel in Google Drive video player.");
+        return;
+    }
+    // Step 2: Extract transcript
+    let transcriptText = '';
+    segments.forEach(seg => {
+        const time = seg.querySelector('.QvmvOc')?.innerText.trim();
+        const text = seg.querySelector('.wyBDIb')?.innerText.trim();
+        if (time && text) {
+            transcriptText += `${time} - ${text}\n`;
+        }
+    });
+    // Try to get the title
+    let title = document.querySelector('.kltatb')?.innerText.trim() || document.title.trim();
+    const finalData = `🎬 Title: ${title}\n\n📄 Transcript:\n${transcriptText}`;
+    // Copy to clipboard
+    try {
+        await navigator.clipboard.writeText(finalData);
+        alert('✅ Transcript copied to clipboard!');
+    } catch (err) {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = finalData;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            alert('✅ Transcript copied (fallback)!');
+        } catch (err) {
+            alert('❌ Copy failed. Please copy manually.');
+        }
+        document.body.removeChild(textarea);
+    }
+})();
+    </div>
+
     <div id="quickTutorialFloating">
       <b style="font-size:1.08em;">Quick Tutorial</b>
       <ol style="margin:10px 0 10px 20px; padding:0 0 0 0;">
         <li style="margin-bottom:7px;"><b>Copy Console Script & Go to YouTube:</b> Click <button onclick="copyConsoleScriptAndGoToYouTube();event.stopPropagation();" style="background:#007bff;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:14px;">Copy & Go</button> to copy the script and open YouTube.</li>
-        <li style="margin-bottom:7px;"><b>Open Developer Tools:</b> On YouTube, press <b>F12</b> or <b>Ctrl+Shift+I</b>, go to <b>Console</b>, paste (Ctrl+V) the script, press <b>Enter</b>.</li>
+        <li style="margin-bottom:7px;"><b>Copy Console Script & Go to Google Drive:</b> Click <button onclick="copyDriveScriptAndGoToDrive();event.stopPropagation();" style="background:#007bff;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:14px;">Copy & Go</button> to copy the script and open Google Drive transcript page.</li>
+        <li style="margin-bottom:7px;"><b>Open Developer Tools:</b> On YouTube or Google Drive, press <b>F12</b> or <b>Ctrl+Shift+I</b>, go to <b>Console</b>, paste (Ctrl+V) the script, press <b>Enter</b>.</li>
         <li style="margin-bottom:7px;"><b>Copy Transcript:</b> The transcript is now copied to your clipboard.</li>
         <li style="margin-bottom:7px;"><b>Paste Transcript:</b> Click <button onclick="pasteTranscript();event.stopPropagation();" style="background:#28a745;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:14px;">Paste</button> here.</li>
         <li style="margin-bottom:7px;"><b>Generate Chunks:</b> Chunks are made automatically, or click <button onclick="processTranscript();event.stopPropagation();" style="background:#ffc107;color:#333;border:none;border-radius:4px;padding:2px 8px;font-size:14px;">Generate</button> if needed.</li>
@@ -884,12 +942,45 @@ ${chunkText}`;
       });
     }
 
+    function copyDriveScriptAndGoToDrive() {
+      const script = document.getElementById("driveScriptBox").innerText;
+      navigator.clipboard.writeText(script).then(() => {
+        alert("✅ Google Drive console script copied! Redirecting to Google Drive...");
+        window.open("https://drive.google.com", "_blank");
+      });
+    }
+
     function pasteTranscript() {
       navigator.clipboard.readText()
         .then(text => {
           document.getElementById("transcript").value = text;
           alert("📥 Transcript pasted from clipboard!");
           processTranscript(); // Automatically generate chunks after pasting
+        })
+        .catch(err => alert("❌ Failed to paste: " + err));
+    }
+
+    function pasteGoogleTranscript() {
+      navigator.clipboard.readText()
+        .then(html => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const segments = doc.querySelectorAll('.JnEIz');
+          let transcriptText = '';
+          segments.forEach(seg => {
+            const time = seg.querySelector('.QvmvOc')?.innerText.trim();
+            const text = seg.querySelector('.wyBDIb')?.innerText.trim();
+            if (time && text) {
+              transcriptText += `${time} - ${text}\n`;
+            }
+          });
+          if (transcriptText.trim().length > 0) {
+            document.getElementById("transcript").value = transcriptText;
+            alert("✅ Transcript extracted from Google Drive format!");
+            processTranscript();
+          } else {
+            alert("❌ No valid transcript segments found. Make sure you copied the right Google Drive transcript HTML.");
+          }
         })
         .catch(err => alert("❌ Failed to paste: " + err));
     }
